@@ -467,6 +467,9 @@ func TestTCPConcurrentAccept(t *testing.T) {
 }
 
 func TestTCPReadWriteAllocs(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping allocation count test on Windows XP") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9":
 		// The implementation of asynchronous cancelable

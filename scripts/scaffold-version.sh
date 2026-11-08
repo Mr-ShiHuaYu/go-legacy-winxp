@@ -208,7 +208,7 @@ checkout_win7 "$WORK_DIR" "$TAG"
 rsync_win7 "$WORK_DIR"
 restore_paths "$preserve_dir"
 
-echo "regenerating patches/0010"
+echo "regenerating patches/0099"
 "$ROOT/scripts/regenerate-xp-patch.sh" "$WORK_DIR"
 
 sanity_checks "$WORK_DIR"

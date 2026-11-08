@@ -11,6 +11,13 @@ import (
 	"unsafe"
 )
 
+// BACKPORT(NT_51): Windows XP's GetAdaptersAddresses does not fill in
+// OnLinkPrefixLength. Derive prefix lengths from the adapter's prefix table.
+var supportsVistaIP = func() bool {
+	major, _, _ := windows.Version()
+	return major >= 6
+}()
+
 // adapterAddresses returns a list of IP adapter and address
 // structures. The structure contains an IP adapter and flattened
 // multiple IP addresses including unicast, anycast and multicast
@@ -111,17 +118,36 @@ func interfaceAddrTable(ifi *Interface) ([]Addr, error) {
 		if index == 0 { // ipv6IfIndex is a substitute for ifIndex
 			index = aa.Ipv6IfIndex
 		}
+		var pfx4, pfx6 []IPNet
+		if !supportsVistaIP {
+			// BACKPORT(NT_51): XP does not fill in OnLinkPrefixLength.
+			pfx4, pfx6, err = addrPrefixTable(aa)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if ifi == nil || ifi.Index == int(index) {
 			for puni := aa.FirstUnicastAddress; puni != nil; puni = puni.Next {
 				sa, err := puni.Address.Sockaddr.Sockaddr()
 				if err != nil {
 					return nil, os.NewSyscallError("sockaddr", err)
 				}
+				var l int
 				switch sa := sa.(type) {
 				case *syscall.SockaddrInet4:
-					ifat = append(ifat, &IPNet{IP: IPv4(sa.Addr[0], sa.Addr[1], sa.Addr[2], sa.Addr[3]), Mask: CIDRMask(int(puni.OnLinkPrefixLength), 8*IPv4len)})
+					if supportsVistaIP {
+						l = int(puni.OnLinkPrefixLength)
+					} else {
+						l = addrPrefixLen(pfx4, IP(sa.Addr[:]))
+					}
+					ifat = append(ifat, &IPNet{IP: IPv4(sa.Addr[0], sa.Addr[1], sa.Addr[2], sa.Addr[3]), Mask: CIDRMask(l, 8*IPv4len)})
 				case *syscall.SockaddrInet6:
-					ifa := &IPNet{IP: make(IP, IPv6len), Mask: CIDRMask(int(puni.OnLinkPrefixLength), 8*IPv6len)}
+					if supportsVistaIP {
+						l = int(puni.OnLinkPrefixLength)
+					} else {
+						l = addrPrefixLen(pfx6, IP(sa.Addr[:]))
+					}
+					ifa := &IPNet{IP: make(IP, IPv6len), Mask: CIDRMask(l, 8*IPv6len)}
 					copy(ifa.IP, sa.Addr[:])
 					ifat = append(ifat, ifa)
 				}
@@ -143,6 +169,47 @@ func interfaceAddrTable(ifi *Interface) ([]Addr, error) {
 		}
 	}
 	return ifat, nil
+}
+
+// BACKPORT(NT_51): addrPrefixTable returns the on-link prefixes reported by
+// GetAdaptersAddresses. Windows XP needs this instead of OnLinkPrefixLength.
+func addrPrefixTable(aa *windows.IpAdapterAddresses) (pfx4, pfx6 []IPNet, err error) {
+	for p := aa.FirstPrefix; p != nil; p = p.Next {
+		sa, err := p.Address.Sockaddr.Sockaddr()
+		if err != nil {
+			return nil, nil, os.NewSyscallError("sockaddr", err)
+		}
+		switch sa := sa.(type) {
+		case *syscall.SockaddrInet4:
+			pfx := IPNet{IP: IP(sa.Addr[:]), Mask: CIDRMask(int(p.PrefixLength), 8*IPv4len)}
+			pfx4 = append(pfx4, pfx)
+		case *syscall.SockaddrInet6:
+			pfx := IPNet{IP: IP(sa.Addr[:]), Mask: CIDRMask(int(p.PrefixLength), 8*IPv6len)}
+			pfx6 = append(pfx6, pfx)
+		}
+	}
+	return
+}
+
+// addrPrefixLen returns an appropriate prefix length in bits for ip from
+// pfxs. It returns 32 or 128 when no appropriate on-link prefix is found.
+func addrPrefixLen(pfxs []IPNet, ip IP) int {
+	var l int
+	for i := range pfxs {
+		if !pfxs[i].Contains(ip) {
+			continue
+		}
+		if m, _ := pfxs[i].Mask.Size(); m > l {
+			l = m
+		}
+	}
+	if l > 0 {
+		return l
+	}
+	if ip.To4() != nil {
+		return 8 * IPv4len
+	}
+	return 8 * IPv6len
 }
 
 // interfaceMulticastAddrTable returns addresses for a specific
