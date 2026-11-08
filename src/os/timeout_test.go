@@ -8,6 +8,7 @@ package os_test
 
 import (
 	"fmt"
+	"internal/testenv"
 	"io"
 	"math/rand"
 	"os"
@@ -630,6 +631,9 @@ func TestReadWriteDeadlineRace(t *testing.T) {
 // TestRacyRead tests that it is safe to mutate the input Read buffer
 // immediately after cancellation has occurred.
 func TestRacyRead(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: no CancelIoEx to interrupt a blocked pipe read") //BACKPORT(NT_51)
+	}
 	t.Parallel()
 
 	for _, tc := range pipeDeadlinesTestCases {
@@ -672,6 +676,9 @@ func TestRacyRead(t *testing.T) {
 // TestRacyWrite tests that it is safe to mutate the input Write buffer
 // immediately after cancellation has occurred.
 func TestRacyWrite(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: no CancelIoEx to interrupt a blocked pipe write") //BACKPORT(NT_51)
+	}
 	t.Parallel()
 
 	for _, tc := range pipeDeadlinesTestCases {

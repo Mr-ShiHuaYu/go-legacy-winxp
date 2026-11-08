@@ -112,6 +112,9 @@ func TestResolveUDPAddr(t *testing.T) {
 }
 
 func TestWriteToUDP(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSASendMsg is not available") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9":
 		t.Skipf("not supported on %s", runtime.GOOS)
@@ -488,6 +491,9 @@ func TestUDPReadTimeout(t *testing.T) {
 }
 
 func TestAllocs(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSASendMsg is not available") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9", "js", "wasip1":
 		// These implementations have not been optimized.
@@ -628,6 +634,9 @@ func BenchmarkWriteToReadFromUDPAddrPort(b *testing.B) {
 }
 
 func TestUDPIPVersionReadMsg(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSARecvMsg is not available") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9":
 		t.Skipf("skipping on %v", runtime.GOOS)
@@ -718,6 +727,9 @@ func TestIPv6WriteMsgUDPAddrPortTargetAddrIPVersion(t *testing.T) {
 // WriteMsgUDPAddrPort accepts IPv4 and IPv4-mapped IPv6 destination addresses,
 // and rejects IPv6 destination addresses on a "udp4" connection.
 func TestIPv4WriteMsgUDPAddrPortTargetAddrIPVersion(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSASendMsg is not available") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9":
 		t.Skipf("not supported on %s", runtime.GOOS)
@@ -757,6 +769,9 @@ func TestIPv4WriteMsgUDPAddrPortTargetAddrIPVersion(t *testing.T) {
 //
 // This is a regression test for https://golang.org/issue/77875.
 func TestReadWriteMsgUDPAddrPortEmptyCmsg(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSASendMsg is not available") //BACKPORT(NT_51)
+	}
 	switch runtime.GOOS {
 	case "plan9":
 		t.Skipf("not supported on %s", runtime.GOOS)

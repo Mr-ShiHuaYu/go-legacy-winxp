@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Regenerate patches/0010-Add-Windows-XP-support.patch from xp-files.list.
+# Regenerate patches/0099-Add-Windows-XP-support.patch from xp-files.list.
 # Usage: regenerate-xp-patch.sh <win7-base-dir>
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LIST="$ROOT/scripts/xp-files.list"
-OUT="$ROOT/patches/0010-Add-Windows-XP-support.patch"
+OUT="$ROOT/patches/0099-Add-Windows-XP-support.patch"
 
 usage() {
   echo "usage: $0 <win7-base-dir>" >&2

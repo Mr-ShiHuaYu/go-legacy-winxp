@@ -218,11 +218,16 @@ func netpoll(delay int64) (gList, int32) {
 			if errno == windows.WAIT_TIMEOUT {
 				return gList{}, 0
 			}
-			if errno == windows.ERROR_OPERATION_ABORTED {
-				return gList{}, 0
+			if ov == nil {
+				// BACKPORT(NT_51): a thread alert is not an I/O completion.
+				if errno == windows.ERROR_OPERATION_ABORTED {
+					return gList{}, 0
+				}
+				println("runtime: GetQueuedCompletionStatus failed (errno=", errno, ")")
+				throw("runtime: netpoll failed")
 			}
-			println("runtime: GetQueuedCompletionStatus failed (errno=", errno, ")")
-			throw("runtime: netpoll failed")
+			// A failed I/O operation still dequeues a completion packet.
+			// Fall through so that a canceled operation wakes its waiter.
 		}
 		entries[0] = overlappedEntry{key: key, ov: ov, qty: bytes}
 		n = 1

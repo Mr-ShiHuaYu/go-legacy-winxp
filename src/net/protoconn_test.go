@@ -111,6 +111,9 @@ func TestTCPConnSpecificMethods(t *testing.T) {
 }
 
 func TestUDPConnSpecificMethods(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: WSASendMsg/WSARecvMsg are not available") //BACKPORT(NT_51)
+	}
 	la, err := ResolveUDPAddr("udp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

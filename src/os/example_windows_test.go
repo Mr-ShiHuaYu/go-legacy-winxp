@@ -12,7 +12,11 @@ import (
 // isOSSymlinkUnsupportedError returns true when err is an error
 // returned by os.Symlink when symlinks are unsupported by OS.
 func isOSSymlinkUnsupportedError(err error) bool {
+	// BACKPORT(NT_51): Windows XP lacks CreateSymbolicLinkW; the lazy
+	// proc lookup reports the missing entry point as a DLLError.
+	var dllErr *syscall.DLLError
 	return errors.Is(err, errors.ErrUnsupported) ||
 		errors.Is(err, syscall.EWINDOWS) ||
-		errors.Is(err, syscall.ERROR_PRIVILEGE_NOT_HELD)
+		errors.Is(err, syscall.ERROR_PRIVILEGE_NOT_HELD) ||
+		(errors.As(err, &dllErr) && dllErr.ObjName == "CreateSymbolicLinkW")
 }

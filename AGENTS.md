@@ -26,7 +26,7 @@ Default branch is `master`.
 ```
 VERSION                      Go version string for this tree
 patches/                     Ordered patch series (win7 0001-0015, 9999, T0001-T0004, plus XP)
-patches/0010-Add-Windows-XP-support.patch  XP delta versus current win7 base
+patches/0099-Add-Windows-XP-support.patch  XP delta versus current win7 base
 src/                         Go source (already patched in-tree)
 scripts/xp-files.list        XP sources preserved across sync
 scripts/fork-files.list      Fork identity paths preserved across sync
@@ -45,10 +45,10 @@ Build artifacts (`bin/`, `pkg/`, generated `z*.go`) are local. Do not commit the
 
 ## Hard rules
 
-1. **Never drop XP patches when updating.** Preserve every change covered by `patches/0010-Add-Windows-XP-support.patch` plus fork identity files listed below.
+1. **Never drop XP patches when updating.** Preserve every change covered by `patches/0099-Add-Windows-XP-support.patch` plus fork identity files listed below.
 2. **Do not replace this tree with stock Go.** Sync from `upstream` win7 tags first.
 3. **Keep fork branding.** `README.md` and `.github/workflows/go-build.yml` stay winxp-named (build the dispatch commit, not win7 `main` / `RELEASE_TOKEN`).
-4. **Regenerate `patches/0010-*.patch` after every successful sync** so the series matches the tree.
+4. **Regenerate `patches/0099-*.patch` after every successful sync** so the series matches the tree.
 5. **Do not invent new markdown docs** unless asked. Update `AGENTS.md` and `skills/` when workflows change.
 6. **No emojis** in repo text. Prefer plain ASCII in scripts and docs.
 
@@ -56,7 +56,7 @@ Build artifacts (`bin/`, `pkg/`, generated `z*.go`) are local. Do not commit the
 
 Authoritative list: `scripts/fork-files.list` (dirs and files preserved by scaffold).
 
-Includes README, AGENTS.md, workflows (`ci`, `go-build`, `xp-test`, `watch-upstream`), `patches/0010`, `scripts/`, `docker/`, `testdata/`, `docs/`, and `skills/`.
+Includes README, AGENTS.md, workflows (`ci`, `go-build`, `xp-test`, `watch-upstream`), `patches/0099`, `scripts/`, `docker/`, `testdata/`, `docs/`, and `skills/`.
 
 ## XP source files (must survive upstream sync)
 

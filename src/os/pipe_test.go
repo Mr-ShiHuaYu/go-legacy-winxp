@@ -165,6 +165,9 @@ func TestStdPipe(t *testing.T) {
 }
 
 func testClosedPipeRace(t *testing.T, read bool) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: no CancelIoEx to interrupt a blocking pipe I/O") //BACKPORT(NT_51)
+	}
 	// This test cannot be run in parallel due to the same race as for TestEPIPE.
 	// (We expect a write to a closed pipe can fail, but a concurrent fork of a
 	// child process can cause the pipe to unexpectedly remain open.)
@@ -299,6 +302,9 @@ func TestCloseWithBlockingReadByFd(t *testing.T) {
 
 // Test that we don't let a blocking read prevent a close.
 func testCloseWithBlockingRead(t *testing.T, r, w *os.File) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: no CancelIoEx to interrupt a blocking pipe read") //BACKPORT(NT_51)
+	}
 	var (
 		enteringRead = make(chan struct{})
 		done         = make(chan struct{})

@@ -1260,7 +1260,9 @@ func (o *outputWriter) writeLine(b []byte, errBegin, errEnd bool) {
 	}
 
 	// Escape the framing marker.
-	b = escapeMarkers(b)
+	if o.c.chatty.json {
+		b = escapeMarkers(b)
+	}
 
 	// If this is the start of an error, add ^O to the start of the output.
 	var strErrBegin, strErrEnd string
@@ -1704,6 +1706,10 @@ func (c *common) Chdir(dir string) {
 	if err != nil {
 		c.Fatal(err)
 	}
+	// BACKPORT(NT_51): Windows XP lacks GetFinalPathNameByHandleW, so
+	// os.(*File).Chdir cannot restore the directory from the descriptor.
+	// Keep the path as a fallback for platforms where it is unsupported.
+	oldpath, oldpathErr := os.Getwd()
 	if err := os.Chdir(dir); err != nil {
 		c.Fatal(err)
 	}
@@ -1725,10 +1731,12 @@ func (c *common) Chdir(dir string) {
 	c.Cleanup(func() {
 		err := oldwd.Chdir()
 		oldwd.Close()
+		if err != nil && oldpathErr == nil {
+			err = os.Chdir(oldpath)
+		}
 		if err != nil {
 			// It's not safe to continue with tests if we can't
-			// get back to the original working directory. Since
-			// we are holding a dirfd, this is highly unlikely.
+			// get back to the original working directory.
 			panic("testing.Chdir: " + err.Error())
 		}
 	})

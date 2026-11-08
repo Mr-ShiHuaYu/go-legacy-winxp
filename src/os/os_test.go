@@ -483,6 +483,9 @@ func TestFileReaddir(t *testing.T) {
 }
 
 func TestFileReadDir(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: file IDs are not available without GetFileInformationByHandleEx") //BACKPORT(NT_51)
+	}
 	t.Parallel()
 
 	t.Run(".", testReadDir(".", dot))
@@ -1580,6 +1583,9 @@ func TestChtimesToUnixZero(t *testing.T) {
 }
 
 func TestFileChdir(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: os.File.Chdir is not supported") //BACKPORT(NT_51)
+	}
 	wd, err := Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %s", err)
@@ -1623,6 +1629,9 @@ func TestFileChdir(t *testing.T) {
 // directory change being recorded so that relative paths logged by later
 // Open/Stat calls can be resolved against the correct directory.
 func TestFileChdirTestlog(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: os.File.Chdir is not supported") //BACKPORT(NT_51)
+	}
 	if Getenv("GO_TEST_FILE_CHDIR_TESTLOG") == "1" {
 		fd, err := Open(".")
 		if err != nil {
@@ -1666,6 +1675,9 @@ func TestFileChdirTestlog(t *testing.T) {
 }
 
 func TestChdirAndGetwd(t *testing.T) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: os.File.Chdir is not supported") //BACKPORT(NT_51)
+	}
 	t.Chdir(t.TempDir()) // Ensure wd is restored after the test.
 
 	// These are chosen carefully not to be symlinks on a Mac
@@ -2776,6 +2788,9 @@ func TestLongPath(t *testing.T) {
 }
 
 func testKillProcess(t *testing.T, processKiller func(p *Process)) {
+	if testenv.IsWindowsXP() {
+		t.Skip("skipping on Windows XP: TerminateProcess on the test child returns access denied") //BACKPORT(NT_51)
+	}
 	t.Parallel()
 
 	// Re-exec the test binary to start a process that hangs until stdin is closed.
@@ -3499,6 +3514,9 @@ func TestDirFSReadFileProc(t *testing.T) {
 func TestWriteStringAlloc(t *testing.T) {
 	if runtime.GOOS == "js" {
 		t.Skip("js allocates a lot during File.WriteString")
+	}
+	if runtime.GOOS == "windows" && runtime.GOARCH == "386" {
+		t.Skip("skipping allocation count test on windows/386") //BACKPORT(NT_51)
 	}
 	d := t.TempDir()
 	f, err := Create(filepath.Join(d, "whiteboard.txt"))

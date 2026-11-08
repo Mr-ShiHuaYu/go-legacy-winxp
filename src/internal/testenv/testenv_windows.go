@@ -6,11 +6,19 @@ package testenv
 
 import (
 	"errors"
+	"internal/syscall/windows"
 	"os"
 	"path/filepath"
 	"sync"
 	"syscall"
 )
+
+// IsWindowsXP reports whether the current OS is Windows XP or Windows
+// Server 2003, which are no longer supported by upstream Go.
+func IsWindowsXP() bool {
+	major, _, _ := windows.Version()
+	return major < 6
+}
 
 var hasSymlink = sync.OnceValues(func() (bool, string) {
 	tmpdir, err := os.MkdirTemp("", "symtest")

@@ -3,7 +3,7 @@ name: upstream-update
 description: >-
   Safely sync go-legacy-winxp from thongtech/go-legacy-win7 while preserving
   Windows XP patches and fork identity. Use when updating Go versions, pulling
-  upstream win7 tags, rebasing onto v1.x.y-N, or refreshing patches/0010.
+  upstream win7 tags, rebasing onto v1.x.y-N, or refreshing patches/0099.
 ---
 
 # Upstream update (win7 -> winxp)
@@ -49,7 +49,7 @@ What it does:
 2. Checks out the win7 tag into the work dir
 3. Rsyncs win7 into this tree (keeps `.git`, excludes fork dirs)
 4. Restores preserved XP + fork identity
-5. Regenerates `patches/0010-Add-Windows-XP-support.patch` via `scripts/regenerate-xp-patch.sh`
+5. Regenerates `patches/0099-Add-Windows-XP-support.patch` via `scripts/regenerate-xp-patch.sh`
 6. Builds and runs PE checks unless skipped
 
 Does not commit or push.

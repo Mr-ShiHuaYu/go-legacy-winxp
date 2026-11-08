@@ -14,6 +14,9 @@ import (
 	"sync"
 )
 
+// IsWindowsXP reports whether the current OS is Windows XP.
+func IsWindowsXP() bool { return false }
+
 var hasSymlink = sync.OnceValues(func() (ok bool, reason string) {
 	switch runtime.GOOS {
 	case "plan9":
