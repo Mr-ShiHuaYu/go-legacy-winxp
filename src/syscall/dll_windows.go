@@ -101,10 +101,22 @@ func SyscallN(p uintptr, args ...uintptr) (r1, r2 uintptr, err Errno) {
 	return syscalln(p, uintptr(len(args)), args...)
 }
 
-// syscalln is implemented in runtime/syscall_windows.go.
+// syscallnRaw is implemented in runtime/syscall_windows.go.
 //
 //go:noescape
-func syscalln(fn, n uintptr, args ...uintptr) (r1, r2 uintptr, err Errno)
+func syscallnRaw(fn, n uintptr, args ...uintptr) (r1, r2 uintptr, err Errno)
+
+// syscalln calls fn with args[:n], after giving the Windows XP export shims a
+// chance to handle the call. See xp_exports_windows.go.
+//
+//go:nosplit
+//go:uintptrkeepalive
+func syscalln(fn, n uintptr, args ...uintptr) (r1, r2 uintptr, err Errno) {
+	if r1, r2, err, ok := xpShimCall(fn, n, args); ok {
+		return r1, r2, err
+	}
+	return syscallnRaw(fn, n, args...)
+}
 
 // N.B. For the loadlibrary, loadlibrary, and getprocaddress functions below:
 //
@@ -134,8 +146,14 @@ func loadsystemlibrary(filename *uint16) (uintptr, Errno) {
 func getprocaddress(handle uintptr, procname *uint8) (uintptr, Errno) {
 	proc, _, err := SyscallN(uintptr(__GetProcAddress), handle, uintptr(unsafe.Pointer(procname)))
 	if proc != 0 {
-		err = 0
+		return proc, 0
 	}
+	// The export may exist, just not on this version of Windows. Hand out a
+	// shim address instead of failing the whole program.
+	if shim := xpExportFallback(handle, procname); shim != 0 {
+		return shim, 0
+	}
+	xpLogMiss(handle, procname)
 	return proc, err
 }
 

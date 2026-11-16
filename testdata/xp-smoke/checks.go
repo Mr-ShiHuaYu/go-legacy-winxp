@@ -19,6 +19,10 @@ import (
 )
 
 func runAllChecks(passed *int) {
+	section("win32_exports")
+	runCheck("export_lazy_gettickcount64", checkLazyGetTickCount64, passed)
+	runCheck("export_ucrt_wmkdir", func() error { return checkUCRTExport(os.TempDir()) }, passed)
+
 	section("runtime")
 	runCheck("runtime_cpus", checkRuntimeCPUs, passed)
 	runCheck("runtime_goroutines", checkGoroutines, passed)

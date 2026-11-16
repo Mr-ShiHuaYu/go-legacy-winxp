@@ -78,9 +78,19 @@ Authoritative list: `scripts/xp-files.list`. Summary:
 - `src/runtime/netpoll_windows.go`
 - `src/runtime/os_windows.go`
 - `src/runtime/signal_windows.go`
+- `src/runtime/syscall_windows.go` (raw `syscall.syscallnRaw` linkname for the export shim hook)
+- `src/syscall/dll_windows.go` (`getprocaddress` and `syscalln` hooks for the export shims)
+- `src/syscall/xp_exports_windows.go` (XP export shims for Vista+ exports resolved at run time)
 - `src/syscall/zsyscall_windows.go`
 
 Vista+ APIs must stay **dynamically loaded** (not `cgo_import_dynamic` static imports) when missing on XP.
+
+Dependencies also resolve exports at run time through `golang.org/x/sys/windows`, which
+linknames `syscall.getprocaddress`/`syscall.loadlibrary`. `src/syscall/xp_exports_windows.go`
+turns a failed lookup of a known Vista+ export into a working substitute (for example
+`GetTickCount64` on `GetTickCount`) and fakes `ucrtbase.dll`, which XP does not have.
+`GODEBUG=xpapi=1` logs every unresolved export, which is how to audit a new dependency
+on a real XP machine. `testdata/xp-smoke` covers both paths (`export_*` checks).
 
 ## Skills
 

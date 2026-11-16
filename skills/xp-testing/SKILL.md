@@ -92,10 +92,19 @@ These must not appear in the PE import table of XP smoke binaries (dynamic `GetP
 - `GetFileInformationByHandleEx`
 - `GetTempPath2W`
 
+## Run-time export shims
+
+`src/syscall/xp_exports_windows.go` covers Vista+ exports that dependencies resolve at run time through `GetProcAddress` (`golang.org/x/sys/windows`, `modernc.org/libc`, the cgo-free SQLite drivers). The shim only triggers when the real lookup fails, so Windows 7+ behaviour is unchanged.
+
+- Audit a dependency on a real XP guest with `set GODEBUG=xpapi=1`; every unresolved export is printed as `xpapi: unresolved export <dll>!<proc>`
+- Add the export to `xpShimTable` in `src/syscall/xp_exports_windows.go` instead of forking the dependency
+- Exports with no layout-compatible XP replacement must stay unmapped and get reported by the diagnostic; do not fake success for struct-returning APIs such as `_stat64i32`
+- `testdata/xp-smoke` runs `export_lazy_gettickcount64` and `export_ucrt_wmkdir` first so the harness fails fast when this path breaks
+
 ## After changing XP runtime / link code
 
 1. `./scripts/check-xp-pe.sh`
 2. `./scripts/test-xp-docker.sh`
-3. Regenerate patch 0010 against the matching win7 checkout:
-   `./scripts/regenerate-xp-patch.sh /tmp/go-legacy-win7`
+3. Regenerate the XP patch against the matching win7 tag:
+   `./scripts/regenerate-xp-patch.sh /path/to/go-legacy-win7`
    (see `skills/upstream-update/SKILL.md`)

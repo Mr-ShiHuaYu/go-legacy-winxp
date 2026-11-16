@@ -22,7 +22,10 @@ src/os/types_windows.go
 src/runtime/netpoll_windows.go
 src/runtime/os_windows.go
 src/runtime/signal_windows.go
+src/runtime/syscall_windows.go
+src/syscall/dll_windows.go
 src/syscall/syscall_windows.go
+src/syscall/xp_exports_windows.go
 src/syscall/zsyscall_windows.go
 src/testing/testing.go
 src/net/file_windows_test.go

@@ -43,13 +43,16 @@ body="$tmpdir/body"
 for rel in "${FILES[@]}"; do
   left="$BASE/$rel"
   right="$ROOT/$rel"
-  if [[ ! -f "$left" ]]; then
-    echo "missing in win7 base: $rel" >&2
-    exit 1
-  fi
   if [[ ! -f "$right" ]]; then
     echo "missing in tree: $rel" >&2
     exit 1
+  fi
+  # A file that does not exist in the win7 base is new XP-only code; diff it
+  # against /dev/null so the patch creates it.
+  newfile=0
+  if [[ ! -f "$left" ]]; then
+    newfile=1
+    left=/dev/null
   fi
   # git diff --no-index exits 1 when files differ
   set +e
@@ -64,12 +67,20 @@ for rel in "${FILES[@]}"; do
     echo "warning: no diff for $rel (tree matches win7 base)" >&2
     continue
   fi
-  # Rewrite paths to a/rel and b/rel (git --no-index uses absolute paths)
-  sed -E \
-    -e "s|^diff --git a/.* b/.*|diff --git a/${rel} b/${rel}|" \
-    -e "s|^--- .*|--- a/${rel}|" \
-    -e "s|^\\+\\+\\+ .*|+++ b/${rel}|" \
-    "$tmpdir/hunk" >>"$body"
+  # Rewrite paths to a/rel and b/rel (git --no-index uses absolute paths).
+  # New files keep their "--- /dev/null" header.
+  if [[ $newfile -eq 1 ]]; then
+    sed -E \
+      -e "s|^diff --git a/.* b/.*|diff --git a/${rel} b/${rel}|" \
+      -e "s|^\\+\\+\\+ .*|+++ b/${rel}|" \
+      "$tmpdir/hunk" >>"$body"
+  else
+    sed -E \
+      -e "s|^diff --git a/.* b/.*|diff --git a/${rel} b/${rel}|" \
+      -e "s|^--- .*|--- a/${rel}|" \
+      -e "s|^\\+\\+\\+ .*|+++ b/${rel}|" \
+      "$tmpdir/hunk" >>"$body"
+  fi
 done
 
 if [[ ! -s "$body" ]]; then

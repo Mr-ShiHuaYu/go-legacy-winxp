@@ -407,7 +407,7 @@ func callbackWrap(a *callbackArgs) {
 // It shouldn't be used in the runtime package,
 // use [stdcall] instead.
 //
-//go:linkname syscall_syscalln syscall.syscalln
+//go:linkname syscall_syscalln syscall.syscallnRaw
 //go:nosplit
 //go:uintptrkeepalive
 func syscall_syscalln(fn, n uintptr, args ...uintptr) (r1, r2, err uintptr) {
