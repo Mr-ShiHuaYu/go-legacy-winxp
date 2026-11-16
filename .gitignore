@@ -62,6 +62,11 @@ _testmain.go
 /docker/xp/iso/*.iso
 /docker/xp/iso/*.partial
 
+# Local XP toolchain assembled by build-xp.bat (contains bin/, pkg/, src/).
+/copy2xp/
+# Log fetched from the XP VM by the rum_xp_vm*.bat deploy script.
+/xp-vm.log
+/xp-vm-kill.log
 
 # This file includes artifacts of Go build that should not be checked in.
 # For files created by specific development environment (e.g. editor),

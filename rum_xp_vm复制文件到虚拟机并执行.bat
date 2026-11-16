@@ -1,121 +1,198 @@
 @echo off
-chcp 65001
-setlocal enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
-REM ========== 请修改以下配置 ==========
-set VMRUN="C:\Program Files (x86)\VMware\VMware Workstation\vmrun.exe"
-set VMX="G:\资料盘\vmwarre machine\Windows XP Professional\Windows XP Professional.vmx"
-set GUEST_USER=Administrator
-set GUEST_PASS=""
+:: ============================================================
+:: Deploy executables from the host into the Windows XP VM,
+:: run a command there, and copy the log back next to this script.
+::
+:: Double-click: copies copy2xp\bin\*.exe to C:\go in the guest
+:: and runs "go version" there, so you can confirm the freshly
+:: built 386 toolchain actually runs on Windows XP.
+::
+:: Usage:
+::   <this script> [sourceDir] [guestDir] [runCommand] [logName] [killImage] [waitSec]
+::
+:: Defaults:
+::   sourceDir   %~dp0copy2xp\bin   (top-level *.exe and *.dll are copied)
+::   guestDir    C:\go
+::   runCommand  go version
+::   logName     xp-vm.log          (written to C:\<logName> in the guest)
+::   killImage   (empty)            run to completion
+::   waitSec     12                 used only when killImage is set
+::
+:: Examples:
+::   <this script>
+::       toolchain smoke test: go version from copy2xp
+::   <this script> "E:\xp-dll-audit\deploy" C:\xptest "xpprobe.exe" xpprobe.log
+::   <this script> "E:\go\code\gf-webman" C:\gfwebman-test "main.exe" main.log main.exe 12
+::       start the server, wait 12s, taskkill it, fetch the log
+::
+:: The one-line cmd arguments are baked into a guest runner .bat,
+:: because this VMware Tools version mangles long command lines.
+:: For whole directory trees use a VMware shared folder instead;
+:: this script is meant for a few files.
+:: ============================================================
 
-REM 主机源目录（所有需要复制的文件所在目录）
-set SOURCE_DIR=E:\go\resources\go-sciter\xp\gopath\src\go-sciter-xp-test\bin
-REM 虚拟机目标目录
-set DEST_DIR=C:\bin
-REM 虚拟机内日志文件路径
-set LOG_GUEST=C:\bin\go-sciter-xp.log
-REM 主机保存的日志文件名
-set LOG_HOST=go-sciter-xp.log
-REM 程序等待秒数
-set WAIT_SEC=5
+set "VMRUN=C:\Program Files (x86)\VMware\VMware Workstation\vmrun.exe"
+set "VMX=D:\vmware machine\Windows XP Professional\Windows XP Professional.vmx"
+set "GUEST_USER=Administrator"
+set "GUEST_PASS=1qaz"
+
+set "SOURCE_DIR=%~1"
+if not defined SOURCE_DIR set "SOURCE_DIR=%~dp0copy2xp\bin"
+set "DEST_DIR=%~2"
+if not defined DEST_DIR set "DEST_DIR=C:\go"
+set "RUN_CMD=%~3"
+if not defined RUN_CMD set "RUN_CMD=go version"
+set "LOG_NAME=%~4"
+if not defined LOG_NAME set "LOG_NAME=xp-vm.log"
+set "KILL_IMAGE=%~5"
+set "WAIT_SEC=%~6"
+if not defined WAIT_SEC set "WAIT_SEC=12"
+
+set "LOG_GUEST=C:\%LOG_NAME%"
+set "LOG_HOST=%~dp0%LOG_NAME%"
+set "KILL_LOG_GUEST=C:\xp-vm-kill.log"
+set "KILL_LOG_HOST=%~dp0xp-vm-kill.log"
+set "RUNNER=%TEMP%\xp-vm-runner.bat"
+set "KILLER=%TEMP%\xp-vm-kill.bat"
 
 echo ========================================
-echo 开始部署 XP 兼容版到 XP 虚拟机
+echo  source : %SOURCE_DIR%
+echo  guest  : %DEST_DIR%  (log %LOG_GUEST%)
+echo  run    : %RUN_CMD%
+echo  kill   : %KILL_IMAGE%
 echo ========================================
 
-echo [1/6] 确保虚拟机内目标目录 %DEST_DIR% 存在...
-%VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest %VMX% "C:\Windows\System32\cmd.exe" "/c if not exist ""%DEST_DIR%"" mkdir ""%DEST_DIR%"""
-if errorlevel 1 (
-    echo [错误] 创建目录失败，请检查 VMware Tools 是否运行
-    pause
-    exit /b 1
+if not exist "%VMRUN%" (
+    echo [ERROR] vmrun not found: "%VMRUN%"
+    goto :fail
 )
-echo 目录已就绪.
+if not exist "%VMX%" (
+    echo [ERROR] virtual machine not found: "%VMX%"
+    goto :fail
+)
+if not exist "%SOURCE_DIR%" (
+    echo [ERROR] source directory not found: "%SOURCE_DIR%"
+    echo         Build copy2xp first ^(build-xp.bat^) or pass a sourceDir argument.
+    goto :fail
+)
 
-echo [2/6] 复制文件到虚拟机 %DEST_DIR% ...
-set COPY_OK=1
-set FOUND_EXE=0
-set EXE_NAME=
+echo [1/6] Ensure %DEST_DIR% exists ...
+"%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest "%VMX%" "C:\WINDOWS\system32\cmd.exe" "/c if not exist %DEST_DIR% mkdir %DEST_DIR%"
+if errorlevel 1 (
+    echo [ERROR] Cannot create "%DEST_DIR%". Is the VM running and VMware Tools active?
+    goto :fail
+)
 
-REM 先复制 bin 目录下所有的 .exe 文件
-echo   扫描 %SOURCE_DIR% 中的 .exe 文件...
+echo [2/6] Copy executables ...
+set "FOUND=0"
 for %%F in ("%SOURCE_DIR%\*.exe") do (
-    set "EXE_FILE=%%~nxF"
-    echo   复制 !EXE_FILE! ...
-    %VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest %VMX% "%%~fF" "%DEST_DIR%\!EXE_FILE!"
-    if errorlevel 1 (
-        echo   [错误] 复制 !EXE_FILE! 失败
-        set COPY_OK=0
-    ) else (
-        set FOUND_EXE=1
-        REM 优先选择带 -xp 或 _xp 的 XP 兼容版 EXE 作为启动目标
-        echo %%~nxF | findstr /i "xp" >nul 2>&1
-        if not errorlevel 1 (
-            set "EXE_NAME=!EXE_FILE!"
+    if exist "%%~fF" (
+        echo   %%~nxF
+        "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest "%VMX%" "%%~fF" "%DEST_DIR%\%%~nxF"
+        if errorlevel 1 (
+            echo   [ERROR] copy failed: %%~nxF
+            goto :fail
         )
-        REM 如果还没选定，就用第一个找到的 exe
-        if "!EXE_NAME!"=="" set "EXE_NAME=!EXE_FILE!"
+        set "FOUND=1"
     )
 )
-
-REM 再复制 sciter.dll
-set "SCITER_DLL=%SOURCE_DIR%\sciter.dll"
-if exist "%SCITER_DLL%" (
-    echo   复制 sciter.dll ...
-    %VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest %VMX% "%SCITER_DLL%" "%DEST_DIR%\sciter.dll"
-    if errorlevel 1 (
-        echo   [错误] 复制 sciter.dll 失败
-        set COPY_OK=0
+for %%F in ("%SOURCE_DIR%\*.dll") do (
+    if exist "%%~fF" (
+        echo   %%~nxF
+        "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest "%VMX%" "%%~fF" "%DEST_DIR%\%%~nxF"
+        if errorlevel 1 (
+            echo   [ERROR] copy failed: %%~nxF
+            goto :fail
+        )
+        set "FOUND=1"
     )
+)
+if "%FOUND%"=="0" (
+    echo [ERROR] No .exe or .dll found in "%SOURCE_DIR%"
+    goto :fail
+)
+
+echo [3/6] Stage the guest scripts ...
+> "%RUNNER%" echo @echo off
+>> "%RUNNER%" echo cd /d "%DEST_DIR%"
+>> "%RUNNER%" echo set "GOROOT=%DEST_DIR%"
+if defined KILL_IMAGE (
+    rem start /b detaches and lets this script end immediately; the kill is
+    rem done by a second script because cmd here does not survive past start.
+    >> "%RUNNER%" echo start "" /b %RUN_CMD% ^> "%LOG_GUEST%" 2^>^&1
 ) else (
-    echo   [警告] %SOURCE_DIR%\sciter.dll 不存在，跳过复制
+    >> "%RUNNER%" echo %RUN_CMD% ^> "%LOG_GUEST%" 2^>^&1
 )
-
-if "%FOUND_EXE%"=="0" (
-    echo [错误] 未找到任何 .exe 文件，请先构建项目
-    pause
-    exit /b 1
-)
-
-if "%COPY_OK%"=="0" (
-    echo [错误] 部分文件复制失败，请检查共享文件夹或文件是否存在
-    pause
-    exit /b 1
-)
-echo 文件复制完成，将要启动的程序: %EXE_NAME%
-
-echo [3/6] 删除虚拟机内旧日志文件 ...
-%VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest %VMX% "C:\Windows\System32\cmd.exe" "/c if exist ""%LOG_GUEST%"" del ""%LOG_GUEST%"""
-
-echo [4/6] 启动程序（工作目录=%DEST_DIR%，日志输出到 %LOG_GUEST%）...
-%VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest %VMX% -interactive -activeWindow "C:\Windows\System32\cmd.exe" "/c cd /d "%DEST_DIR%" && "%EXE_NAME%" > "%LOG_GUEST%""
-
-set RUN_EC=%ERRORLEVEL%
-if %RUN_EC% neq 0 (
-    echo [错误] 程序执行失败，exitcode=%RUN_EC%，正在拉取日志...
-    goto :FETCH_LOG
-)
-echo 程序已启动.
-
-rem echo [5/6] 等待程序运行 %WAIT_SEC% 秒 ...
-rem timeout /t %WAIT_SEC% /nobreak
-
-:FETCH_LOG
-echo [5/6] 从虚拟机拷贝日志到主机当前目录 ...
-%VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% copyFileFromGuestToHost %VMX% "%LOG_GUEST%" "%LOG_HOST%"
+"%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest "%VMX%" "%RUNNER%" "C:\xp-vm-runner.bat"
 if errorlevel 1 (
-    echo [警告] 拷贝日志失败，可能日志文件尚未生成（程序仍在运行或崩溃太快）
-) else (
-    echo 日志已保存到 %LOG_HOST%
-    echo ---------- 日志内容 ----------
-    if exist "%LOG_HOST%" type "%LOG_HOST%"
-    echo ------------------------------
+    echo [ERROR] Cannot copy the runner to the guest.
+    goto :fail
+)
+if defined KILL_IMAGE (
+    > "%KILLER%" echo @echo off
+    >> "%KILLER%" echo ping -n %WAIT_SEC% 127.0.0.1 ^>nul
+    rem The program still holds %LOG_GUEST% as its stdout, so the kill log
+    rem goes to its own file instead of appending to the program log.
+    >> "%KILLER%" echo taskkill /f /im %KILL_IMAGE% ^> "%KILL_LOG_GUEST%" 2^>^&1
+    "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% CopyFileFromHostToGuest "%VMX%" "%KILLER%" "C:\xp-vm-kill.bat"
+    if errorlevel 1 (
+        echo [ERROR] Cannot copy the killer script to the guest.
+        goto :fail
+    )
 )
 
-echo [6/6] 清理虚拟机内的临时日志文件 ...
-%VMRUN% -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest %VMX% "C:\Windows\System32\cmd.exe" "/c if exist ""%LOG_GUEST%"" del ""%LOG_GUEST%"""
+echo [4/6] Clear the old guest log ...
+"%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest "%VMX%" "C:\WINDOWS\system32\cmd.exe" "/c if exist %LOG_GUEST% del %LOG_GUEST%"
 
+echo [5/6] Run ...
+"%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest "%VMX%" -interactive -activeWindow "C:\WINDOWS\system32\cmd.exe" "/c C:\xp-vm-runner.bat"
+if defined KILL_IMAGE (
+    echo       letting it run for %WAIT_SEC%s, then taskkill %KILL_IMAGE% ...
+    "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% runProgramInGuest "%VMX%" -interactive -activeWindow "C:\WINDOWS\system32\cmd.exe" "/c C:\xp-vm-kill.bat"
+)
+
+echo [6/6] Fetch the log ...
+if exist "%LOG_HOST%" del "%LOG_HOST%"
+set "FETCHED=0"
+for /L %%i in (1,1,5) do (
+    if "!FETCHED!"=="0" (
+        "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% copyFileFromGuestToHost "%VMX%" "%LOG_GUEST%" "%LOG_HOST%" >nul 2>&1
+        if not errorlevel 1 set "FETCHED=1"
+    )
+)
+if "!FETCHED!"=="0" (
+    echo [ERROR] Log not fetched: "%LOG_GUEST%"
+    echo         The program may still be running; start it with a killImage argument.
+    goto :fail
+)
+if defined KILL_IMAGE (
+    if exist "%KILL_LOG_HOST%" del "%KILL_LOG_HOST%"
+    for /L %%i in (1,1,3) do (
+        if not exist "%KILL_LOG_HOST%" (
+            "%VMRUN%" -T ws -gu %GUEST_USER% -gp %GUEST_PASS% copyFileFromGuestToHost "%VMX%" "%KILL_LOG_GUEST%" "%KILL_LOG_HOST%" >nul 2>&1
+        )
+    )
+)
+
+echo ---------- log ----------
+type "%LOG_HOST%"
+echo -------------------------
+if defined KILL_IMAGE (
+    if exist "%KILL_LOG_HOST%" (
+        echo ---------- taskkill ----------
+        type "%KILL_LOG_HOST%"
+        echo -------------------------------
+    )
+)
 echo ========================================
-echo 完成！
+echo  Done. Log saved to %LOG_HOST%
 echo ========================================
-pause
+if "%NOPAUSE%"=="" pause
+exit /b 0
+
+:fail
+echo.
+if "%NOPAUSE%"=="" pause
+exit /b 1
