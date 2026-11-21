@@ -56,7 +56,7 @@ Build artifacts (`bin/`, `pkg/`, generated `z*.go`) are local. Do not commit the
 
 Authoritative list: `scripts/fork-files.list` (dirs and files preserved by scaffold).
 
-Includes README, AGENTS.md, workflows (`ci`, `go-build`, `xp-test`, `watch-upstream`), `patches/0099`, `scripts/`, `docker/`, `testdata/`, `docs/`, and `skills/`.
+Includes README, AGENTS.md, workflows (`ci`, `go-build`, `xp-test`, `watch-upstream`), `patches/0099`, `build-xp.bat`, `rum_xp_vm*.bat`, `scripts/`, `docker/`, `testdata/`, `docs/`, and `skills/`.
 
 ## XP source files (must survive upstream sync)
 
@@ -121,6 +121,8 @@ Bootstrap toolchain (needs a host Go for bootstrap):
 cd src
 ./make.bash
 ```
+
+On Windows use `src/make.bat` instead; `make.bash` refuses to run there. `build-xp.bat` wraps it with `GOHOSTARCH=386` and assembles `copy2xp/`.
 
 Use the built toolchain:
 

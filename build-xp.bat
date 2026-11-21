@@ -139,7 +139,7 @@ if exist "%ROOT%\go.env" copy /Y "%ROOT%\go.env" "%DIST%\" >nul
 >> "%DIST%\README.txt" echo Usage on the XP machine:
 >> "%DIST%\README.txt" echo   1. Copy this whole folder anywhere, for example C:\go
 >> "%DIST%\README.txt" echo   2. Open cmd and run:   C:\go\setgo.bat
->> "%DIST%\README.txt" echo   3. go version   should print: go1.27.3 windows/386
+>> "%DIST%\README.txt" echo   3. go version   should print: go1.27.4 windows/386
 >> "%DIST%\README.txt" echo.
 >> "%DIST%\README.txt" echo Notes:
 >> "%DIST%\README.txt" echo   - bin\go.exe is a 32-bit host toolchain and matches

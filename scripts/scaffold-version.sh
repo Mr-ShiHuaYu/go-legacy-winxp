@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Sync this tree onto a go-legacy-win7 tag while preserving XP sources and fork identity.
 # Usage: scaffold-version.sh TAG [--work-dir DIR] [--skip-build] [--skip-pe] [--force]
+#
+# rsync is optional. Without it, tracked files are overlaid with tar and stale
+# tracked files are pruned through git; untracked build output is left alone.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,6 +17,10 @@ WORK_DIR="$DEFAULT_WORK"
 SKIP_BUILD=0
 SKIP_PE=0
 FORCE=0
+HAVE_RSYNC=0
+if command -v rsync >/dev/null 2>&1; then
+  HAVE_RSYNC=1
+fi
 
 usage() {
   cat >&2 <<EOF
@@ -142,32 +149,69 @@ preserve_paths() {
     if [[ -d "$ROOT/$src" ]]; then
       mkdir -p "$dest/$src"
       # Preserve directory contents under dest/$src
-      rsync -a "$ROOT/$src/" "$dest/$src/"
+      cp -a "$ROOT/$src/." "$dest/$src/"
     else
       cp -a "$ROOT/$src" "$dest/$src"
     fi
   done
 }
 
-rsync_win7() {
+sync_win7() {
   local src="$1"
-  echo "rsync win7 tree into $ROOT"
-  rsync -a --delete \
-    --exclude='.git' \
-    --exclude='bin' \
-    --exclude='pkg' \
-    --exclude='AGENTS.md' \
-    --exclude='skills' \
-    --exclude='scripts' \
-    --exclude='docker' \
-    --exclude='testdata' \
-    "$src/" "$ROOT/"
+  if [[ "$HAVE_RSYNC" -eq 1 ]]; then
+    echo "rsync win7 tree into $ROOT"
+    rsync -a --delete \
+      --exclude='.git' \
+      --exclude='bin' \
+      --exclude='pkg' \
+      --exclude='AGENTS.md' \
+      --exclude='skills' \
+      --exclude='scripts' \
+      --exclude='docker' \
+      --exclude='testdata' \
+      "$src/" "$ROOT/"
+    return
+  fi
+
+  # No rsync (for example Git Bash on Windows): overlay the win7 tree, then
+  # prune tracked files it no longer contains. Untracked build output (bin/,
+  # pkg/, copy2xp/) is deliberately untouched.
+  echo "rsync not found; overlaying win7 tree with tar"
+  tar -C "$src" --exclude=.git -cf - . | tar -C "$ROOT" -xf -
+
+  echo "pruning tracked files removed by win7"
+  local work
+  work="$(mktemp -d "${TMPDIR:-/tmp}/winxp-prune.XXXXXX")"
+  git -C "$ROOT" -c core.quotePath=false ls-tree -r --name-only HEAD | sort >"$work/local"
+  (cd "$src" && find . -path ./.git -prune -o -type f -print |
+    sed 's|^\./||' | sort) >"$work/base"
+  comm -23 "$work/local" "$work/base" >"$work/extras"
+
+  mapfile -t xp_files < <(read_list "$XP_LIST")
+  mapfile -t fork_paths < <(read_list "$FORK_LIST")
+  local f rel k keep removed=0
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    keep=0
+    for rel in "${xp_files[@]}" "${fork_paths[@]}"; do
+      k="${rel%/}"
+      case "$f" in
+        "$k"|"$k"/*) keep=1; break ;;
+      esac
+    done
+    if [[ $keep -eq 0 && -f "$ROOT/$f" ]]; then
+      rm -f -- "$ROOT/$f"
+      removed=$((removed + 1))
+    fi
+  done <"$work/extras"
+  rm -rf "$work"
+  echo "pruned $removed stale tracked files"
 }
 
 restore_paths() {
   local src="$1"
   echo "restoring XP sources and fork identity"
-  rsync -a "$src/" "$ROOT/"
+  cp -a "$src/." "$ROOT/"
 }
 
 sanity_checks() {
@@ -205,7 +249,7 @@ echo "preserving XP and fork files"
 preserve_paths "$preserve_dir"
 
 checkout_win7 "$WORK_DIR" "$TAG"
-rsync_win7 "$WORK_DIR"
+sync_win7 "$WORK_DIR"
 restore_paths "$preserve_dir"
 
 echo "regenerating patches/0099"

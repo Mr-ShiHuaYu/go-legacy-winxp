@@ -92,6 +92,7 @@ grep -n 'go-legacy-winxp\|GITHUB_SHA\|package-toolchain.sh' README.md .github/wo
 - Do not commit `bin/`, `pkg/`, or `docker/xp/storage`.
 - Commit only when the user asks.
 - File lists are authoritative: `scripts/xp-files.list` and `scripts/fork-files.list`.
+- `rsync` is optional. Without it (Git Bash on Windows), scaffold overlays with `tar` and prunes stale tracked files via `git`, leaving untracked build output alone.
 
 ## Failure modes
 

@@ -6,7 +6,7 @@ Preserve Windows XP compatibility: PE 5.1 targeting and dynamic
 loading of Vista+ APIs.
 ---
 diff --git a/src/cmd/link/internal/ld/pe.go b/src/cmd/link/internal/ld/pe.go
-index bdbf4b1e..15c500eb 100644
+index 73e6dbdd..b6503ce8 100644
 --- a/src/cmd/link/internal/ld/pe.go
 +++ b/src/cmd/link/internal/ld/pe.go
 @@ -281,10 +281,12 @@ type IMAGE_LOAD_CONFIG_DIRECTORY64 struct {
@@ -25,7 +25,7 @@ index bdbf4b1e..15c500eb 100644
  	PeMinimumTargetMinorVersion = 1
  )
  
-@@ -1922,7 +1924,7 @@ func peCreateExportFile(ctxt *Link, libName string) (fname string) {
+@@ -1926,7 +1928,7 @@ func peCreateExportFile(ctxt *Link, libName string) (fname string) {
  	var buf bytes.Buffer
  
  	if ctxt.BuildMode == BuildModeCShared {

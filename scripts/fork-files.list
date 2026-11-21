@@ -9,6 +9,8 @@ AGENTS.md
 .github/dependabot.yml
 patches/0099-Add-Windows-XP-support.patch
 .gitignore
+build-xp.bat
+rum_xp_vm复制文件到虚拟机并执行.bat
 scripts/
 docker/
 testdata/
